@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "/Users/mgg/dev/projets/kbox/kbox_bin",
+    "connect",
+    "{connection_file}",
+    "py3.12-docker"
+  ],
+  "display_name": "KBox Py3.12",
+  "language": "python"
+}
