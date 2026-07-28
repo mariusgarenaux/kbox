@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -26,48 +25,10 @@ func NewKBoxClient() (*KBoxClient, error) {
 	return &KBoxClient{cli: cli, ctx: ctx}, nil
 }
 
-func (k *KBoxClient) IsRunning(containerID string) (bool, error) {
-	inspect, err := k.cli.ContainerInspect(k.ctx, containerID)
-	if err != nil {
-		return false, err
-	}
-	return inspect.State.Running, nil
-}
-
-func (k *KBoxClient) StartContainer(containerID string) error {
-	return k.cli.ContainerStart(k.ctx, containerID, container.StartOptions{})
-}
-
 func (k *KBoxClient) StopContainer(containerID string) error {
 	return k.cli.ContainerStop(k.ctx, containerID, container.StopOptions{})
 }
 
-func (k *KBoxClient) RestartContainer(containerID string) error {
-	return k.cli.ContainerRestart(k.ctx, containerID, container.StopOptions{})
-}
-
-func (k *KBoxClient) GetLogs(containerID string) (string, error) {
-	out, err := k.cli.ContainerLogs(k.ctx, containerID, container.LogsOptions{ShowStdout: true, ShowStderr: true})
-	if err != nil {
-		return "", err
-	}
-	defer out.Close()
-	
-	buf := make([]byte, 4096)
-	n, err := out.Read(buf)
-	if err != nil && n == 0 {
-		return "", err
-	}
-	return string(buf[:n]), nil
-}
-
-func (k *KBoxClient) ListImages() ([]image.Summary, error) {
-	images, err := k.cli.ImageList(k.ctx, image.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return images, nil
-}
 
 func (k *KBoxClient) ConnectKBox(connectionFile string, dockerTag string, dockerRun []string) (string, error) {
 	// 1. Ensure connectionFile is an absolute path
