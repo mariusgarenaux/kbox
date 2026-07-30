@@ -36,7 +36,7 @@ func (k *KBoxClient) ConnectKBox(connectionFile string, dockerTag string, docker
 	if err != nil {
 		return "", fmt.Errorf("error resolving absolute path for connection file: %w", err)
 	}
-
+	
 	
 	// Read and modify connection file
 	data, err := os.ReadFile(absConnFile)
@@ -50,22 +50,22 @@ func (k *KBoxClient) ConnectKBox(connectionFile string, dockerTag string, docker
 	}
 	
 	// Helper function to append logs to kbox_debug.log
-	logDebug := func(msg string) {
-		f, err := os.OpenFile("kbox_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err == nil {
-			defer f.Close()
-			f.WriteString(msg + "\n")
-		}
-	}
-
-	// Change host IP to 0.0.0.0 for port-forwarding
+	// logDebug := func(msg string) {
+	// 	f, err := os.OpenFile("kbox_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// 	if err == nil {
+	// 		defer f.Close()
+	// 		f.WriteString(msg + "\n")
+	// 	}
+	// }
+	
+	// Change host IP to 0.0.0.0 for port-forwarding (mac only)
 	config["ip"] = "0.0.0.0"
 	modifiedData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("error marshaling JSON: %w", err)
 	}
 	
-	logDebug(fmt.Sprintf("DEBUG: Modified config : %s", modifiedData))
+	// logDebug(fmt.Sprintf("DEBUG: Modified config : %s", modifiedData))
 	// Update connection file directly to preserve inode for Docker mounts
 	if err := os.WriteFile(absConnFile, modifiedData,  0644); err != nil {
 		// logDebug(fmt.Sprintf("ERROR: while writing connection file to %s", absConnFile))
@@ -98,25 +98,24 @@ func (k *KBoxClient) ConnectKBox(connectionFile string, dockerTag string, docker
 	}
 	
 	cwd, _ := os.Getwd()
-	logDebug(fmt.Sprintf("docker Run : %s", dockerRun))
+	
+	// logDebug(fmt.Sprintf("docker Run : %s", dockerRun))
 	// 3. Create Container
 	resp, err := k.cli.ContainerCreate(k.ctx, &container.Config{
 		Image: dockerTag,
 		Cmd:   dockerRun,
-		// Cmd:   []string{"cat", "/connection_file.json"},
-		// Cmd:   []string{"cat", "/notebook/bonjour.md"},
 		// Cmd:   []string{"tail", "-f", "/dev/null"},
 		Tty:   true,
-		WorkingDir: "/notebook",
+		WorkingDir: "/kbox",
 	}, &container.HostConfig{
 		PortBindings: portBinds,
 		AutoRemove:   true,
 		Binds: []string{
 			fmt.Sprintf("%s:/connection_file.json", absConnFile),
-			fmt.Sprintf("%s:/notebook", cwd),
+			fmt.Sprintf("%s:/kbox", cwd),
 		},
 	}, nil, nil, containerName)
-
+	
 	// logDebug(fmt.Sprintf("Container Response : %s", resp))
 	if err != nil {
 		// logDebug("Error while creating the container")
@@ -128,7 +127,7 @@ func (k *KBoxClient) ConnectKBox(connectionFile string, dockerTag string, docker
 		// logDebug(fmt.Sprintf("Error while starting the container : %s", err))
 		return "", fmt.Errorf("error starting container: %w", err)
 	}
-
+	
 	// logDebug("Successfully started the container and verified it is ready")
 	return resp.ID, nil
 }

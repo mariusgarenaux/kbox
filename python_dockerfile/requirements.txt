@@ -1,0 +1,11 @@
+numpy
+matplotlib
+scipy
+ipykernel
+ipython
+seaborn
+statsmodels
+jupyter-console
+tqdm
+scikit-learn
+bash_kernel 
