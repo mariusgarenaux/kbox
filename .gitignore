@@ -1,4 +1,5 @@
 kbox_bin
-kbox_debug.log
+**/kbox_debug.log
 test.ipynb
 tests
+**/jupyter_pydantic_ai_config.yaml

@@ -16,12 +16,45 @@ func printUsage() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  kbox <command> [arguments]")
 	fmt.Println("\nCommands:")
-	fmt.Println("  start  - Setup and start a kernel container (requires connection_file and tag)")
-	fmt.Println("  install - Create a Jupyter kernelspec for a Docker image")
+	fmt.Println("  start   - Setup and start a kernel container (requires connection_file and tag)")
+	fmt.Println("  install - Create a Jupyter kernelspec for a Docker image from a built-in name or kernelspec directory")
+	fmt.Println("  list    - List all built-in kernels available for installation")
 	fmt.Println("\nExample:")
 	fmt.Println("  kbox start ./kernel-connection.json my-image:latest --argv python -m ipykernel_launcher -f /connection_file.json")
-	fmt.Println("  kbox install my-image:latest my-kernel-name [new_kernel_name]")
+	fmt.Println("  kbox install my-image:latest python3 [new_kernel_name]")
+	fmt.Println("  kbox install my-image:latest /path/to/kernelspec [new_kernel_name]")
+	fmt.Println("  kbox list")
 }
+
+type BuiltInKernel struct {
+	DisplayName string   `json:"display_name"`
+	Language    string   `json:"language"`
+	Argv        []string `json:"argv"`
+}
+
+var knownKernels = map[string]BuiltInKernel{
+	"python3": {
+		DisplayName: "Python 3",
+		Language:    "python",
+		Argv:        []string{"python", "-m", "ipykernel_launcher", "-f", "{connection_file}"},
+	},
+	"python": {
+		DisplayName: "Python 3",
+		Language:    "python",
+		Argv:        []string{"python", "-m", "ipykernel_launcher", "-f", "{connection_file}"},
+	},
+	"bash": {
+		DisplayName: "Bash",
+		Language:    "bash",
+		Argv:        []string{"python", "-m", "bash_kernel", "-f", "{connection_file}"},
+	},
+	"pydantic_ai": {
+		DisplayName: "Pydantic AI Agent",
+		Language:    "text",
+		Argv:        []string{"python", "-m", "pydantic_ai_kernel", "-f", "{connection_file}"},
+	},
+}
+
 
 func main() {
 	if len(os.Args) < 2 {
@@ -88,37 +121,49 @@ func main() {
 		}
 	} else if cmd == "install" {
 		if len(os.Args) < 4 {
-			fmt.Println("Error: 'install' requires docker_tag and kernelspec")
-			fmt.Println("Usage: kbox install <docker_tag> <kernelspec>")
+			fmt.Println("Error: 'install' requires docker_tag and kernelspec path")
+			fmt.Println("Usage: kbox install <docker_tag> <path_to_kernelspec_dir> [new_kernel_name]")
 			os.Exit(1)
 		}
 		tag := os.Args[2]
 		kernelInput := os.Args[3]
-		kernelName := filepath.Base(kernelInput)
 
-		// Try to find if this is an existing kernel to wrap
 		var sourceKernelspec map[string]interface{}
-		
-		// Determine base kernels directory based on OS
+		var kernelName string
+
+		// Check if the input is a known built-in kernel
+		if builtIn, ok := knownKernels[kernelInput]; ok {
+			kernelName = kernelInput
+			sourceKernelspec = map[string]interface{}{
+				"display_name": builtIn.DisplayName,
+				"language":     builtIn.Language,
+				"argv":         builtIn.Argv,
+			}
+		} else {
+			// If not a built-in name, it must be a path
+			if !filepath.IsAbs(kernelInput) && !strings.Contains(kernelInput, "/") {
+				fmt.Println("Error: 'install' requires a known built-in kernel name or a path to a kernelspec directory")
+				fmt.Println("Usage: kbox install <docker_tag> <built_in_name|path_to_kernelspec_dir> [new_kernel_name]")
+				os.Exit(1)
+			}
+
+			// Verify the path exists and is a directory
+			if info, err := os.Stat(kernelInput); err == nil && info.IsDir() {
+				kernelName = filepath.Base(kernelInput)
+				kernelJsonPath := filepath.Join(kernelInput, "kernel.json")
+				if data, err := os.ReadFile(kernelJsonPath); err == nil {
+					json.Unmarshal(data, &sourceKernelspec)
+				}
+			} else {
+				fmt.Printf("Error: path %s is not a directory or does not exist\n", kernelInput)
+				os.Exit(1)
+			}
+		}
+
+		// Determine base kernels directory based on OS for the destination
 		baseKernelsDir := filepath.Join(os.Getenv("HOME"), ".local", "share", "jupyter", "kernels")
 		if runtime.GOOS == "darwin" {
 			baseKernelsDir = filepath.Join(os.Getenv("HOME"), "Library", "Jupyter", "kernels")
-		}
-
-		// Check if kernelInput is a path or a name that exists in baseKernelsDir
-		var searchDir string
-		if filepath.IsAbs(kernelInput) {
-			searchDir = filepath.Dir(kernelInput)
-		} else {
-			searchDir = filepath.Join(baseKernelsDir, kernelInput)
-		}
-
-		// If the path is actually a directory containing kernel.json, we use it as source
-		if info, err := os.Stat(searchDir); err == nil && info.IsDir() {
-			kernelJsonPath := filepath.Join(searchDir, "kernel.json")
-			if data, err := os.ReadFile(kernelJsonPath); err == nil {
-				json.Unmarshal(data, &sourceKernelspec)
-			}
 		}
 
 		// Create a unique name for the kbox wrapped kernel to avoid overwriting the source
@@ -146,6 +191,14 @@ func main() {
 				for _, a := range srcArgv {
 					val := fmt.Sprintf("%v", a)
 					val = strings.ReplaceAll(val, "{connection_file}", "/connection_file.json")
+					wrappedArgv = append(wrappedArgv, val)
+				}
+				argv = wrappedArgv
+			} else if srcArgv, ok := sourceKernelspec["argv"].([]string); ok {
+				// Handle case where it's already a string slice (from built-in)
+				wrappedArgv := []string{execPath, "start", "{connection_file}", tag, "--argv"}
+				for _, a := range srcArgv {
+					val := strings.ReplaceAll(a, "{connection_file}", "/connection_file.json")
 					wrappedArgv = append(wrappedArgv, val)
 				}
 				argv = wrappedArgv
@@ -182,6 +235,11 @@ func main() {
 		}
 
 		fmt.Printf("Jupyter Kernelspec created for '%s' at %s\n", kboxKernelName, kernelspecDir)
+	} else if cmd == "list" {
+		fmt.Println("Available built-in kernels:")
+		for name, kernel := range knownKernels {
+			fmt.Printf("  - %s (%s): %s\n    Argv: %v\n", name, kernel.Language, kernel.DisplayName, kernel.Argv)
+		}
 	} else {
 		printUsage()
 	}
