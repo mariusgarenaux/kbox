@@ -1,66 +1,69 @@
 # KBox
 
-KBox helps to run container from jupyter frontends (e.g. notebooks), and talk to the container through this frontend. This allows for :
+KBox enables you to run Jupyter kernels inside Docker containers while maintaining a seamless connection via your preferred Jupyter frontend (e.g., Jupyter Notebooks, JupyterLab, or VS Code).
 
-- containerized code execution (of any kernel : python, bash, ai-agent, ...)
+By wrapping the kernel execution in a container, KBox provides:
+- **Isolated Execution**: Run any kernel (Python, Bash, AI agents, etc.) in a fully containerized environment.
+- **Simplified Management**: Easily switch between different environment images and kernel versions without polluting your host machine.
+- **Automatic Lifecycle**: Containers are automatically started when the kernel is launched and removed when the notebook is closed.
 
-- easy container and kernel management
+## Getting Started
 
-## Getting started
-
-Compile the project :
+### 1. Installation
+Compile the project to create the `kbox` binary:
 
 ```bash
 go build -o kbox ./kbox
 ```
 
-Then, run :
+### 2. Identify Target Kernels
+List the kernels available on your host machine to see which ones you want to containerize:
 
 ```bash
 jupyter kernelspec list
 ```
 
-to see which kernels are available to be containerized, for example :
-
+Example output:
 ```text
 python3        /Users/mgg/Library/Jupyter/kernels/python3
 ```
 
-To install a containerized version of this kernel :
+### 3. Install a Containerized Kernel
+Use `kbox` to create a new kernelspec that points to a Docker image.
 
 ```bash
-kbox install image_name:latest python3 kbox-py3.13
+kbox install <image_name:tag> <original_kernel_name> <new_kernel_name>
 ```
 
-> with image_name:latest being any docker image installed than can start the kernel you want to install (a container with python3.13 and ipykernel for this example) --- see [python_dockerfile](./python_dockerfile/) for examples.
-
-Then, `jupyter kernelspec list` should output :
-
+**Example:**
+To create a containerized Python 3.13 kernel using a specific image:
 ```bash
+kbox install my-python-env:latest python3 kbox-py3.13
+```
+*Note: The Docker image must contain the necessary runtime and `ipykernel` to support the kernel. See [python_dockerfile](./python_dockerfile/) for examples.*
+
+### 4. Verification
+Verify that the new kernel is installed:
+```bash
+jupyter kernelspec list
+```
+
+You should now see your new kernel in the list:
+```text
 kbox-py3.13    /Users/mgg/Library/Jupyter/kernels/kbox-py3.13
-python3        /Users/mgg/Library/Jupyter/kernels/python3
+python3         /Users/mgg/Library/Jupyter/kernels/python3
 ```
 
-Any use of the kbox kernel should now launch an instance of image_name:latest, start a ipython3 kernel inside it, and communicate with the notebook (or other frontend) that started the kernel as usual. Closing the notebook will stop and remove the container.
+## Usage
 
-To test :
+Once installed, simply select the `kbox-` kernel from your Jupyter dropdown. KBox will launch an instance of the specified Docker image and bridge the communication between the notebook and the container.
 
+**Key Features:**
+- **Working Directory**: The directory where the KBox kernel is started is automatically mounted into the container, providing easy access to local datasets and files.
+- **Host Independence**: The original kernel only needs to exist as a `kernelspec` on the host; it does not actually need to be executable on the host machine itself.
+
+### Quick Test
+You can test the installation via the terminal:
 ```bash
 jupyter console --kernel kbox-py3.13
-```
-
-
-> The directory where the kbox kernel is started is mounted on the container, allowing to access current datasets, ...
-
-> Note : kbox only need the kernelspec file, but the kernel itself does not have to be startable from the host machine.
-
-Example of kernels :
-
-```text
-  ir             /Users/mgg/Library/Jupyter/kernels/ir
-  kbox-bash      /Users/mgg/Library/Jupyter/kernels/kbox-bash
-  kbox-py3.11    /Users/mgg/Library/Jupyter/kernels/kbox-py3.11
-  kbox-py3.12    /Users/mgg/Library/Jupyter/kernels/kbox-py3.12
-  kbox-py3.13    /Users/mgg/Library/Jupyter/kernels/kbox-py3.13
-  python3        /Users/mgg/Library/Jupyter/kernels/python3
 ```
