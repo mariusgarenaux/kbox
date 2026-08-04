@@ -11,10 +11,14 @@ By wrapping the kernel execution in a container, KBox provides:
 ## Getting Started
 
 ### 1. Installation
-Compile the project to create the `kbox` binary:
+Download pre-compiled binaries from [https://github.com/mariusgarenaux/kbox/releases](https://github.com/mariusgarenaux/kbox/releases).
+
+Or re-compile the project :
 
 ```bash
-go build -o kbox ./kbox
+git clone https://github.com/mariusgarenaux/kbox
+cd kbox/kbox
+go build -o kbox .
 ```
 
 ### 2. Installing a Containerized Kernel
@@ -34,6 +38,8 @@ To install a built-in kernel:
 ```bash
 ./kbox install my-python-env:latest python3 kbox-py3.13
 ```
+
+> This will create a kernelspec that, when the kernel is started, will start the my-python-env:latest docker container. Inside this container, a ipython kernel will be started, with ZMQ ports forwarded outside of the container, towards the jupyter frontend that started the kernel.
 
 #### Using a Custom Kernelspec Path
 If you have a specific kernel configuration on your disk, you can point KBox to its directory:
