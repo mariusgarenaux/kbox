@@ -11,6 +11,10 @@ import (
 	"syscall"
 )
 
+var (
+	version = "dev"
+)
+
 func printUsage() {
 	fmt.Println("KBox - Jupyter Kernel Container Management CLI")
 	fmt.Println("\nUsage:")

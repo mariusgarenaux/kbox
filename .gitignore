@@ -3,3 +3,4 @@ kbox_bin
 test.ipynb
 tests
 **/jupyter_pydantic_ai_config.yaml
+**/dist
